@@ -40,6 +40,7 @@ This README reflects the current code in the repository. It intentionally does n
 |   |-- depth/
 |   `-- test/
 `-- src/
+    |-- dataset_convert.py
     |-- dataloader.py
     |-- evaluate.py
     |-- model.py
@@ -145,6 +146,99 @@ call, dislike, like, ok, one, palm, peace, rock, stop, three
 These labels are used during training, validation, confusion matrix generation, and overlay visualization.
 
 ## Dataset Format
+
+If your dataset is not already in the flat training format, read the conversion section below first before trying to train the model.
+
+### Converting Nested Datasets to Training Format
+
+Some input datasets may not initially follow the flat training structure used by `src/train.py`. In particular, you may receive data in a nested layout such as:
+
+```text
+dataset/
+`-- 25045993_He/
+    |-- G01_call/
+    |   `-- clip01/
+    |       |-- annotation/
+    |       |-- depth/
+    |       `-- rgb/
+    `-- ...
+```
+
+This repository includes a conversion utility at `src/dataset_convert.py` to transform that nested clip-style structure into the flat training format:
+
+```text
+dataset/
+|-- 25045993_He/              <- original nested input is kept
+|-- annotation/G01/0001.png
+|-- depth/G01/0001.png
+`-- rgb/G01/0001.png
+```
+
+The script only copies frames that exist in all three folders:
+
+- `annotation`
+- `depth`
+- `rgb`
+
+Non-image files such as `.json` and `.npy` are ignored.
+
+The conversion script can only be used when the input dataset follows this pattern:
+
+- the input root points either directly to the gesture folders, or to a parent folder that contains exactly one such submission folder
+- gesture folders must start with a gesture prefix such as `G01`, `G02`, ..., `G10`
+- clip folders inside each gesture folder must be named like `clip01`, `clip02`, ...
+- each clip folder must contain all three image folders:
+  - `annotation`
+  - `depth`
+  - `rgb`
+- frame files must be image files with matching stems across the three folders
+
+Examples of valid gesture folder names:
+
+- `G01_call`
+- `G02_dislike`
+- `G10_three`
+- `G01`
+
+Examples of valid clip folder names:
+
+- `clip01`
+- `clip02`
+- `clip15`
+
+The script is not intended for:
+
+- already-flat training datasets in `annotation/depth/rgb/G0X` format
+- datasets missing one or more required modality folders
+- arbitrary folder names that do not start with a `Gxx` gesture prefix
+- clip folders that do not start with `clip`
+
+Before running the script, set the input and output paths near the top of `src/dataset_convert.py`:
+
+```python
+INPUT_ROOT = Path("dataset/25045993_He")
+OUTPUT_ROOT = Path("dataset")
+```
+
+This is the recommended setup when:
+
+- `dataset/25045993_He` contains the original nested clip-style dataset
+- `dataset/` is where you want the generated `annotation/`, `depth/`, and `rgb/` folders to appear
+
+Then run:
+
+```bash
+python -m src.dataset_convert
+```
+
+Important behavior:
+
+- the original nested input folder is kept
+- only `dataset/annotation`, `dataset/depth`, and `dataset/rgb` are rebuilt
+- output file names are renumbered per gesture using four digits, for example `0001.png`
+- gesture IDs are detected from the prefix only, such as `G01`, `G02`, ..., `G10`
+
+If your dataset is already in flat training format, the script will detect that and do nothing.
 
 ### Training / Validation Dataset
 
